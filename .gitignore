@@ -36,3 +36,7 @@ logs/
 
 # Optional: Docker volumes/data
 *.sqlite
+
+# Firebase & Secret Keys
+serviceAccountKey.json
+*.pem
