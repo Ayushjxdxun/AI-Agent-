@@ -7,7 +7,7 @@ import { FcGoogle } from 'react-icons/fc';
 function Home() {
     const handleLogin = async (token) => {
     try{
-      const {data}= await api.post("/auth/login",{token});
+      const {data}= await api.post("/api/auth/login",{token});
       console.log(data);
     } catch(error){
       console.log(error);
@@ -23,23 +23,23 @@ function Home() {
       console.log(data);
   }
   return (
-    <div className='h-screen flex bg-[#0d0f14] text-white overflow-hidden'>
-      <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur'>
-        <div className='w-[340px] bg-[#13151c] border border-white/[0.08] rounded-2xl p-7 flex flex-col gap-5'>
-          <div className='flex flex-col gap-1'>
-            <h2 className='text-[17px] font-semibold text-slate-100 tracking-tight'>
-              Welcome to AskAI
+    <div className='h-screen flex bg-[#0a0d14] text-slate-100 overflow-hidden'>
+      <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md transition-all'>
+        <div className='w-[350px] bg-[#121824] border border-slate-800/80 rounded-2xl p-7 flex flex-col gap-6 shadow-2xl shadow-indigo-950/20'>
+          <div className='flex flex-col gap-1.5'>
+            <h2 className='text-[18px] font-semibold text-white tracking-tight'>
+              Welcome to CortexAI
             </h2>
-            <p className='text-[13px] text-slate-500'>
+            <p className='text-[13px] text-slate-400 leading-relaxed'>
               Please login to continue using the app.
             </p>
           </div>
 
           <button
-            className='w-full flex items-center justify-center gap-3 py-[11px] rounded-xl text-sm font-medium text-black/90 bg-white hover:bg-gray-200 transition-all duration-150 cursor-pointer'
+            className='w-full flex items-center justify-center gap-3 py-[12px] rounded-xl text-sm font-semibold text-slate-900 bg-white hover:bg-slate-100 active:scale-[0.98] transition-all duration-200 cursor-pointer shadow-md shadow-black/20'
             onClick={googleLogin}
           >
-            <FcGoogle size={15} />
+            <FcGoogle size={18} />
             Continue With Google
           </button>
         </div>
