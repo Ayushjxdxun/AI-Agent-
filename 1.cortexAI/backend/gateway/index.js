@@ -6,6 +6,8 @@ import cookieParser from "cookie-parser";
 // import { createProxyMiddleware } from "http-proxy-middleware";
 import protect from "./middleware/auth.middleware.js";
 import { getCurrentUser } from "./controllers/user.controller.js";
+import { proxyWithHeader } from "./utils/proxyWithHeader.js";
+const port = process.env.PORT;
 dotenv.config();
 
 const port = process.env.PORT;
@@ -21,6 +23,7 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use("/api/auth", proxy(process.env.AUTH_SERVICE));
+app.use("/api/chat",protect, proxyWithHeader(process.env.CHAT_SERVICE));
 
 app.get("/api/me", protect, getCurrentUser);
 app.get("/", (req, res) => {
