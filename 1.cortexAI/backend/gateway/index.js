@@ -11,7 +11,10 @@ dotenv.config();
 const port = process.env.PORT;
 
 const app = express();
-
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
 app.use(cors({
   origin: process.env.FRONTEND_URL, 
   credentials: true

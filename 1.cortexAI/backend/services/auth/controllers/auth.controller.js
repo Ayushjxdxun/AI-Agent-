@@ -26,8 +26,8 @@ export const login = async (req, res) => {
     }),"EX",60*60*24*7);
     res.cookie("session",sessionId,{
         httpOnly:true,
-        secure:false,
-        sameSite:"strict",
+        secure:true,
+        sameSite:"none",
         maxAge:1000*60*60*24*7
     });
     return res.status(200).json(user);

@@ -3,12 +3,17 @@ import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../../utils/firebase';
 import api from "../../utils/axios";
 import { FcGoogle } from 'react-icons/fc';
-
+import { useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
+import { setUserData } from '../redux/userSlice';
 function Home() {
+  const {userData}=useSelector(state=>state.user);
+  //console.log(userData);
+  const dispatch = useDispatch();//so that as soon as you login ,then info is available even if you dete session from inspect tab 
     const handleLogin = async (token) => {
     try{
       const {data}= await api.post("/api/auth/login",{token});
-      console.log(data);
+      dispatch(setUserData(data));
     } catch(error){
       console.log(error);
     }
@@ -24,11 +29,12 @@ function Home() {
   }
   return (
     <div className='h-screen flex bg-[#0a0d14] text-slate-100 overflow-hidden'>
+      {!userData &&
       <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md transition-all'>
         <div className='w-[350px] bg-[#121824] border border-slate-800/80 rounded-2xl p-7 flex flex-col gap-6 shadow-2xl shadow-indigo-950/20'>
           <div className='flex flex-col gap-1.5'>
             <h2 className='text-[18px] font-semibold text-white tracking-tight'>
-              Welcome to CortexAI
+              Welcome to AskAI
             </h2>
             <p className='text-[13px] text-slate-400 leading-relaxed'>
               Please login to continue using the app.
@@ -43,7 +49,7 @@ function Home() {
             Continue With Google
           </button>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
