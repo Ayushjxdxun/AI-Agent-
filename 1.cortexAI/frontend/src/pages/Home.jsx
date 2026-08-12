@@ -6,6 +6,9 @@ import { FcGoogle } from 'react-icons/fc';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { setUserData } from '../redux/userSlice';
+import SideBar from '../components/SideBar';
+import ChatArea from '../components/ChatArea';
+import Artifact from '../components/Artifact';
 function Home() {
   const {userData}=useSelector(state=>state.user);
   //console.log(userData);
@@ -29,6 +32,11 @@ function Home() {
   }
   return (
     <div className='h-screen flex bg-[#0a0d14] text-slate-100 overflow-hidden'>
+
+
+    <SideBar/>
+    <ChatArea/>
+    <Artifact/>
       {!userData &&
       <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md transition-all'>
         <div className='w-[350px] bg-[#121824] border border-slate-800/80 rounded-2xl p-7 flex flex-col gap-6 shadow-2xl shadow-indigo-950/20'>

@@ -7,7 +7,7 @@ import cookieParser from "cookie-parser";
 import protect from "./middleware/auth.middleware.js";
 import { getCurrentUser } from "./controllers/user.controller.js";
 import { proxyWithHeader } from "./utils/proxyWithHeader.js";
-const port = process.env.PORT;
+
 dotenv.config();
 
 const port = process.env.PORT;
