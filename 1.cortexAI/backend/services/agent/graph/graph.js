@@ -18,7 +18,7 @@ workflow.addNode("ppt",pptAgent)
 workflow.addNode("search",searchAgent)
 
 workflow.addEdge("__start__", "router")
-workflow.addConditionalEdge("router", (state) => {
+workflow.addConditionalEdges("router", (state) => {
     switch(state.agent) {
         case "chat":
             return "chat";

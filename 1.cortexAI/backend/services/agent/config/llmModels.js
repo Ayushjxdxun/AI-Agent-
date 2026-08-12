@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { ChatGroq } from "@langchain/groq"
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai"
 const groq = new ChatGroq({
@@ -8,7 +9,7 @@ const gemini=new ChatGoogleGenerativeAI({
     model: "gemini-205-flash"
 })
 
-export const getModal=(agent)=>{
+export const getModel=(agent)=>{
     switch(agent) {
         case "chat":
             return groq;
