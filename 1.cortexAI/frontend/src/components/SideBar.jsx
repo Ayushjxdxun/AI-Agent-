@@ -5,20 +5,24 @@ import {useEffect} from 'react';
 import { createConversation } from '../features/createConversation';
 import { getConversations } from '../features/getConversations';
 import { useDispatch } from 'react-redux';
-import { addConversation, setConversations } from '../redux/conversationSlice';
+import { addConversation, setConversations, setSelectedConversation } from '../redux/conversationSlice';
+import { useSelector } from 'react-redux';
+import { MessageSquare } from 'lucide-react';
 function SideBar() {
   const [collapsed, setCollapsed] = useState(false);
   const dispatch=useDispatch();
+  const {conversations,selectedConversation}=useSelector(state=>state.conversation);
   useEffect(() => {
       const getConv=async ()=>{
         const data=await getConversations();
-        dispatch(setConversations(data));
+        dispatch(setConversations(data.conversations));
       }
       getConv();
   },[])
 const handleCreateConversation = async () => {
     const data=await createConversation();
     dispatch(addConversation(data));
+    dispatch(setSelectedConversation(data))
 }
 
   return (
@@ -47,6 +51,36 @@ const handleCreateConversation = async () => {
             New Chat
         </button>
       </div>
+      {conversations.length ==0 ? 
+      <div className='px-5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-widest text-slate-600'>
+        No Recent Conversations
+      </div>
+      :
+      (
+        <div className='px-5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-widest text-slate-600'>
+          Recents
+        </div>
+
+      )}
+      <div className=''>
+        {conversations.map((conv,i)=>{
+          const isActive=selectedConversation?._id===conv._id;
+          return (
+            <div
+              onClick={()=>dispatch(setSelectedConversation(conv))}
+              className={`flex items-center gap-2.5 cursor-pointer mb-0.5 px-3 py-2.5 rounded-[10px] border transition-colors duration-150 ${
+  isActive
+    ? "bg-indigo-500/10 border-indigo-500/[0.18]"
+    : "bg-transparent border-transparent"
+}`}>
+            <MessageSquare/>
+            <span>{conv?.title || "New Chat"}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      
 
 
       </div>
