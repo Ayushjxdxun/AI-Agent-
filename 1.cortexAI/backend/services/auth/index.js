@@ -1,6 +1,7 @@
 import dns from "node:dns";
 import express from "express";
 import dotenv from "dotenv";
+import cookieParser from "cookie-parser";
 import connectDB from "./config/db.js";
 import router from "./routes/auth.route.js";
 // import cors from "cors";
@@ -13,6 +14,7 @@ const port = process.env.PORT;
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 app.use("/", router);
 app.get("/", (req, res) => {
   res.json({ message: "Hello from Auth" });

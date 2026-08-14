@@ -37,13 +37,17 @@ export const login = async (req, res) => {
   }
 }
 
-export const logout = async (req, res) => {
+export const logOut = async (req, res) => {
   try {
-    const sessionId=req.cookies.session;
+    const sessionId=req.cookies?.session;
     if(sessionId) {
         await redis.del(`session-${sessionId}`);
-        res.clearCookie("session");
     }
+    res.clearCookie("session", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none"
+    });
     return res.status(200).json({message:"Logout successful"});
   } catch (error) {
     console.log(error);
