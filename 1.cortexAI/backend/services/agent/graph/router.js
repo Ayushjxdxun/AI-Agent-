@@ -1,6 +1,6 @@
 import { getModel } from "../config/llmModels.js"
 export const router=async (state)=>{
-    const llm=getModel("router")
+    const llm=await getModel("router")
     const prompt=`You are an agent router.
     
     Available agents:
@@ -56,6 +56,7 @@ export const router=async (state)=>{
     ${state.prompt}`
 
 const response=await llm.invoke(prompt);
+const cleanedAgent = response.content.replace(/[^a-zA-Z]/g, "").toLowerCase();
 console.log(response);
 return {
     ...state,

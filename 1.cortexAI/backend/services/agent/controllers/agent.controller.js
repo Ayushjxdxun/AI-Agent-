@@ -8,8 +8,12 @@ export const agent=async(req,res) =>{
             prompt,
             conversationId
         })
-        const response=result.aiResponse
-        return res.status(200).json({response})
+        const response = typeof result === "string"
+            ? result
+            : (result?.content || result?.aiResponse || result?.messages?.[result.messages.length - 1]?.content || "");
+        await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{conversationId,role:"assistant",content:response})
+        
+        return res.status(200).json({content:response})
     }catch(error){
         console.log(error);
         return res.status(500).json({ message: "Internal server error" });
