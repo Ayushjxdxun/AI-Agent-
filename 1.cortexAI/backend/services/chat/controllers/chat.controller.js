@@ -46,13 +46,14 @@ const normalizeMessageContent = (content) => {
 
 export const saveMessage = async (req, res) => {
     try {
-        const {conversationId, role, content,images} = req.body;
+        const {conversationId, role, content,images,artifacts} = req.body;
         const safeContent = normalizeMessageContent(content) || (Array.isArray(images) && images.length ? "Here are the images you asked for." : "");
         const message =await Message.create({
             conversationId,
             role,
             content: safeContent,
-            images: Array.isArray(images) ? images.filter(Boolean) : []
+            images: Array.isArray(images) ? images.filter(Boolean) : [],
+            artifacts
         });
         return res.status(200).json({ message: "Message saved successfully", message });
     } catch (error) {

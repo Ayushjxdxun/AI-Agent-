@@ -57,12 +57,37 @@ const normalizeTableLikeMarkdown = (text = '') => {
   return [headerLine, separatorLine, ...bodyLines].join('\n')
 }
 
-function MessageBubble({ role, content, images }) {
+const cleanCodeBlock = (text = '') => {
+  if (typeof text !== 'string') return ''
+
+  return text
+    .replace(/^\s*```(?:json|javascript|js|typescript|ts|html|css|cpp|c\+\+|python)?\s*/i, '')
+    .replace(/\s*```\s*$/i, '')
+    .trim()
+}
+
+function MessageBubble({ role, content, images, artifacts = [] }) {
   const isUser = role === 'user'
   const safeImages = Array.isArray(images) ? images.filter(Boolean) : []
-  const safeContent = typeof content === 'string' ? content : ''
+  const safeArtifacts = Array.isArray(artifacts) ? artifacts.filter(Boolean) : []
+  const safeContent = typeof content === 'string' ? content : typeof content === 'object' ? JSON.stringify(content, null, 2) : ''
+  const isJsonLike = typeof safeContent === 'string' && safeContent.trim().startsWith('{')
   const normalizedContent = normalizeTableLikeMarkdown(safeContent)
+  const formattedContent = isJsonLike ? `\n\n\`\`\`json\n${cleanCodeBlock(safeContent)}\n\`\`\`\n` : normalizedContent
   const [selectedImage, setSelectedImage] = useState(null)
+
+  const getCodeContentFromNode = (node) => {
+    if (typeof node === 'string') return node
+    if (Array.isArray(node)) return node.map(getCodeContentFromNode).join('')
+    if (node && typeof node === 'object') {
+      if (typeof node.props?.children === 'string') return node.props.children
+      if (Array.isArray(node.props?.children)) return node.props.children.map(getCodeContentFromNode).join('')
+      if (typeof node.children === 'string') return node.children
+      if (Array.isArray(node.children)) return node.children.map(getCodeContentFromNode).join('')
+      if (node.value) return String(node.value)
+    }
+    return ''
+  }
 
   const markdownComponents = {
     h1: ({ children }) => <h1 className="mt-5 mb-3 text-xl font-bold text-violet-200 tracking-tight">{children}</h1>,
@@ -79,20 +104,23 @@ function MessageBubble({ role, content, images }) {
       </a>
     ),
     code: ({ inline, className, children }) => {
+      const text = getCodeContentFromNode(children)
       if (inline) {
-        return <code className="rounded-md border border-white/10 bg-slate-900/70 px-1.5 py-0.5 text-[12px] text-violet-200">{children}</code>
+        return <code className="rounded-md border border-white/10 bg-slate-900/70 px-1.5 py-0.5 text-[12px] text-violet-200">{text}</code>
       }
-      return <code className={className}>{children}</code>
+      return <code className={className || 'block rounded-md bg-[#0a1222] px-3 py-2 text-[12.5px] text-slate-100'}>{text}</code>
     },
     pre: ({ children, ...props }) => {
-      const codeText = Array.isArray(children)
-        ? children.map((child) => (typeof child === 'string' ? child : child?.props?.children || '')).join('')
-        : (typeof children === 'string' ? children : '')
+      const codeText = getCodeContentFromNode(children)
+      const cleanedCode = cleanCodeBlock(codeText)
 
       return (
-        <div className="relative mb-4">
-          <CopyCodeButton code={codeText} />
-          <pre {...props} className="overflow-x-auto rounded-xl border border-white/10 bg-slate-950/80 p-3 pt-10 text-[12.5px] leading-6 text-slate-100">
+        <div className="relative mb-4 overflow-hidden rounded-2xl border border-[#2a3350] bg-[#050c1d] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+          <div className="flex items-center justify-between border-b border-[#1d2740] bg-[#0d152b] px-3 py-2">
+            <span className="text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400">Code</span>
+            <CopyCodeButton code={cleanedCode} />
+          </div>
+          <pre {...props} className="overflow-x-auto p-4 text-[12.5px] leading-6 text-slate-100">
             {children}
           </pre>
         </div>
@@ -154,8 +182,50 @@ function MessageBubble({ role, content, images }) {
           )}
 
           <div className="markdown-content text-[13.5px] leading-7 break-words">
-            <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{normalizedContent}</Markdown>
+            <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{formattedContent}</Markdown>
           </div>
+
+          {safeArtifacts.length > 0 && (
+            <div className="mt-4 space-y-3 border-t border-white/10 pt-4">
+              {safeArtifacts.map((artifact, index) => {
+                const files = Array.isArray(artifact?.files) ? artifact.files : []
+                return (
+                  <div key={artifact?.id || index} className="rounded-xl border border-violet-500/20 bg-slate-950/70 p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-violet-300">
+                        {artifact?.type || 'Artifact'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {files.map((file, fileIndex) => {
+                        const fileName = file?.name || `file-${fileIndex + 1}`
+                        const fileContent = typeof file?.content === 'string' ? file.content : JSON.stringify(file?.content ?? file, null, 2)
+
+                        return (
+                          <div key={`${fileName}-${fileIndex}`} className="overflow-hidden rounded-lg border border-white/10 bg-slate-900/80">
+                            <div className="flex items-center justify-between border-b border-white/10 bg-slate-950/80 px-3 py-2">
+                              <span className="text-[11px] font-medium text-slate-200">{fileName}</span>
+                              <button
+                                type="button"
+                                onClick={() => navigator.clipboard?.writeText?.(fileContent).catch(() => {})}
+                                className="rounded border border-white/10 bg-slate-900 px-2 py-1 text-[10px] text-slate-200 hover:border-violet-400/50 hover:text-white"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                            <pre className="max-h-72 overflow-auto p-3 text-[12px] leading-6 text-slate-100">
+                              <code>{fileContent}</code>
+                            </pre>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
 

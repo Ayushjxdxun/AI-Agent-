@@ -31,7 +31,7 @@ function Home() {
       console.log(data);
   }
   return (
-    <div className='h-screen flex bg-[#0a0d14] text-slate-100 overflow-hidden'>
+    <div className='h-screen flex min-w-0 bg-[#0a0d14] text-slate-100 overflow-hidden'>
 
 
     <SideBar/>

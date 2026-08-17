@@ -7,7 +7,7 @@ import { useSelector } from 'react-redux'
 function ChatArea() {
   const { selectedConversation } = useSelector((state) => state.conversation)
   return (
-    <div className='flex-1 flex flex-col'>
+    <div className='flex-1 min-w-0 flex flex-col'>
       <Nav/>
       <MessageList/>
       <ChatInput/>

@@ -12,7 +12,55 @@ const extractImageUrls = (text) => {
     const urls = text.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s)"'>]*)?/gi) || [];
     return [...new Set(urls.map((url) => url.trim()))];
 };
+const extractArtifactFiles = (payload) => {
+    if (!payload) return [];
 
+    let candidate = payload;
+    if (typeof payload === 'string') {
+        let text = payload.trim();
+
+        if (text.startsWith('```')) {
+            text = text.replace(/^```(?:json|javascript|js|ts|typescript)?\s*/i, '').replace(/```\s*$/i, '').trim();
+        }
+
+        if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+            try {
+                const unwrapped = JSON.parse(text);
+                if (typeof unwrapped === 'string') text = unwrapped;
+            } catch {
+                text = text.slice(1, -1);
+            }
+        }
+
+        const firstBrace = text.indexOf('{');
+        const lastBrace = text.lastIndexOf('}');
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+            text = text.slice(firstBrace, lastBrace + 1);
+        }
+
+        try {
+            candidate = JSON.parse(text);
+        } catch {
+            const match = text.match(/"name"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"content"\s*:\s*"((?:\\.|[^"\\])*)"/gs);
+            if (!match) return [];
+
+            return match.map((entry) => {
+                const fileMatch = entry.match(/"name"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"content"\s*:\s*"((?:\\.|[^"\\])*)"/s);
+                if (!fileMatch) return null;
+                return {
+                    name: fileMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\r/g, '\r').replace(/\\t/g, '\t'),
+                    content: fileMatch[2].replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+                };
+            }).filter(Boolean);
+        }
+    }
+
+    if (candidate && Array.isArray(candidate.files)) {
+        return candidate.files.filter((file) => file && typeof file.name === 'string' && typeof file.content === 'string');
+    }
+
+    return [];
+};
 function ChatInput() {
     const [value,setValue]=useState("")
     const [selectedAgent,setSelectedAgent]=useState("Auto")
@@ -73,13 +121,17 @@ function ChatInput() {
             const aiImages = Array.isArray(aiResponseData?.images) && aiResponseData.images.length
                 ? aiResponseData.images
                 : extractImageUrls(aiContent);
+            const aiArtifacts = Array.isArray(aiResponseData?.artifacts) && aiResponseData.artifacts.length
+                ? aiResponseData.artifacts
+                : extractArtifactFiles(aiContent);
 
             const assistantMessage = {
                 _id: Date.now() + 1,
                 conversationId: conversation?._id,
                 role: "assistant",
                 content: aiContent || (aiImages.length ? "Here are the images you asked for." : ""),
-                images: aiImages
+                images: aiImages,
+                artifacts: aiArtifacts
             }
 
             if (aiContent || aiImages.length) {

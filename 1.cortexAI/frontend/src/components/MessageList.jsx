@@ -31,11 +31,12 @@ function MessageList() {
           .filter((msg) => {
             const hasText = typeof msg?.content === "string" ? msg.content.trim().length > 0 : false;
             const hasImages = Array.isArray(msg?.images) ? msg.images.length > 0 : false;
-            return hasText || hasImages;
+            const hasArtifacts = Array.isArray(msg?.artifacts) ? msg.artifacts.length > 0 : false;
+            return hasText || hasImages || hasArtifacts;
           })
           .map((msg, i)=>(
           <div key={msg?._id || `${msg?.role}-${i}`}>
-            <MessageBubble role={msg?.role} content={msg?.content} images={msg.images || []}/>
+            <MessageBubble role={msg?.role} content={msg?.content} images={msg.images || []} artifacts={msg?.artifacts || []}/>
           </div>
         ))}
         </div>}
