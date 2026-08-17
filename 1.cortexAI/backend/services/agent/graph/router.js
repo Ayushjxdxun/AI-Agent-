@@ -7,13 +7,10 @@ export const router=async (state)=>{
     }
     }
 
-    const promptText = String(state.prompt || "").toLowerCase();
-    const imageKeywords = [
-        "image", "images", "picture", "pictures", "photo", "photos",
-        "give me", "show me", "find me", "render", "dog", "cat", "women", "men", "nature"
-    ];
+    const promptText = String(state.prompt || "");
+    const imageRequestPattern = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|wallpaper|poster|screenshot|screenshots)\b|\b(?:generate|create|make|draw|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\b|\b(?:show|give|find)\s+(?:me\s+)?(?:a\s+)?(?:image|images|picture|pictures|photo|photos)\b|\b(?:image|photos?|pictures?)\s+(?:of|for)\b/i;
 
-    if (imageKeywords.some((keyword) => promptText.includes(keyword))) {
+    if (imageRequestPattern.test(promptText)) {
         return {
             ...state,
             agent: "search"

@@ -116,7 +116,7 @@ export const chatAgent=async (state)=>{
     const response=await llm.invoke(messages)
     const responseContent = normalizeContent(response.content)
     const responseImages = extractImages(response.content)
-    const isImageRequest = /image|images|picture|pictures|photo|photos|show me|give me|find me|dog|cat|woman|women|man|men/i.test(String(state.prompt || ""));
+    const isImageRequest = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|wallpaper|poster|screenshot|screenshots)\b|\b(?:generate|create|make|draw|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\b|\b(?:show|give|find)\s+(?:me\s+)?(?:a\s+)?(?:image|images|picture|pictures|photo|photos)\b|\b(?:image|photos?|pictures?)\s+(?:of|for)\b/i.test(String(state.prompt || ""));
     const finalImages = (Array.isArray(state.images) && state.images.length > 0)
         ? state.images
         : responseImages;

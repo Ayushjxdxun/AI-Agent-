@@ -11,13 +11,23 @@ const sanitizeSearchResults = (results = []) => {
     }));
 };
 
+const isImageRequest = (prompt = "") => {
+    const normalizedPrompt = String(prompt);
+    const imageRequestPattern = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|wallpaper|poster|screenshot|screenshots)\b|\b(?:generate|create|make|draw|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\b|\b(?:show|give|find)\s+(?:me\s+)?(?:a\s+)?(?:image|images|picture|pictures|photo|photos)\b|\b(?:image|photos?|pictures?)\s+(?:of|for)\b/i;
+
+    return imageRequestPattern.test(normalizedPrompt);
+};
+
 export const searchAgent=async (state)=>{
     try {
         const results=await searchTool.invoke({
             query:state.prompt
         })
         const sanitizedResults = sanitizeSearchResults(results?.results || [])
-        const imageUrls = sanitizedResults.flatMap((result) => result.images).filter(Boolean).slice(0, 8)
+        const wantsImages = isImageRequest(state.prompt)
+        const imageUrls = wantsImages
+            ? sanitizedResults.flatMap((result) => result.images).filter(Boolean).slice(0, 8)
+            : [];
 
         return {
             ...state,
