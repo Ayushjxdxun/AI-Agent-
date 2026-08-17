@@ -33,10 +33,27 @@ export const updateConversation = async (req, res) => {
     }
 };
 
+const normalizeMessageContent = (content) => {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+        return content.map((item) => typeof item === "string" ? item : (item?.text || "")).join("\n");
+    }
+    if (content && typeof content === "object") {
+        return content.text || "";
+    }
+    return "";
+};
+
 export const saveMessage = async (req, res) => {
     try {
-        const {conversationId, role, content} = req.body;
-        const message =await Message.create({conversationId, role, content});
+        const {conversationId, role, content,images} = req.body;
+        const safeContent = normalizeMessageContent(content) || (Array.isArray(images) && images.length ? "Here are the images you asked for." : "");
+        const message =await Message.create({
+            conversationId,
+            role,
+            content: safeContent,
+            images: Array.isArray(images) ? images.filter(Boolean) : []
+        });
         return res.status(200).json({ message: "Message saved successfully", message });
     } catch (error) {
         return res.status(500).json({ message: `save message error ${error.message}` });
@@ -46,7 +63,12 @@ export const saveMessage = async (req, res) => {
 export const getMessage = async (req, res) => {
     try {
         const messages =await Message.find({conversationId:req.params.conversationId});
-        return res.status(200).json({ message: "Messages retrieved successfully", messages });
+        const filteredMessages = messages.filter((msg) => {
+            const hasText = typeof msg?.content === "string" ? msg.content.trim().length > 0 : false;
+            const hasImages = Array.isArray(msg?.images) ? msg.images.length > 0 : false;
+            return hasText || hasImages;
+        });
+        return res.status(200).json({ message: "Messages retrieved successfully", messages: filteredMessages });
     } catch (error) {
         return res.status(500).json({ message: `get messages error ${error.message}` });
     }

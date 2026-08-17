@@ -1,5 +1,25 @@
 import { getModel } from "../config/llmModels.js"
 export const router=async (state)=>{
+    if(state.agent&&state.agent!=="auto") {
+        return {
+        ...state,
+        agent:state.agent
+    }
+    }
+
+    const promptText = String(state.prompt || "").toLowerCase();
+    const imageKeywords = [
+        "image", "images", "picture", "pictures", "photo", "photos",
+        "give me", "show me", "find me", "render", "dog", "cat", "women", "men", "nature"
+    ];
+
+    if (imageKeywords.some((keyword) => promptText.includes(keyword))) {
+        return {
+            ...state,
+            agent: "search"
+        }
+    }
+
     const llm=await getModel("router")
     const prompt=`You are an agent router.
     
