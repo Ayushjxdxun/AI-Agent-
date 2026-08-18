@@ -66,9 +66,41 @@ const cleanCodeBlock = (text = '') => {
     .trim()
 }
 
+const sanitizeImageList = (images = []) => {
+  if (!Array.isArray(images)) return []
+
+  const unique = new Set()
+  return images
+    .map((image) => {
+      const raw = typeof image === 'string' ? image : image?.url || image?.src || image?.image_url?.url || ''
+      if (typeof raw !== 'string') return ''
+
+      const trimmed = raw.trim()
+      if (!trimmed || !/^https?:\/\//i.test(trimmed) || /\b(?:null|undefined)\b/i.test(trimmed)) return ''
+
+      try {
+        const parsed = new URL(trimmed)
+        if (!['http:', 'https:'].includes(parsed.protocol)) return ''
+        const pathname = parsed.pathname.toLowerCase()
+        const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?.*)?$/i.test(pathname)
+        const hasImageFolder = /\/(?:images?|photos?|media|uploads?|files?|attachments?|content)\//i.test(pathname)
+        if (!hasImageExt && !hasImageFolder) return ''
+        return trimmed
+      } catch {
+        return ''
+      }
+    })
+    .filter(Boolean)
+    .filter((url) => {
+      if (unique.has(url)) return false
+      unique.add(url)
+      return true
+    })
+}
+
 function MessageBubble({ role, content, images, artifacts = [] }) {
   const isUser = role === 'user'
-  const safeImages = Array.isArray(images) ? images.filter(Boolean) : []
+  const safeImages = sanitizeImageList(images)
   const safeArtifacts = Array.isArray(artifacts) ? artifacts.filter(Boolean) : []
   const safeContent = typeof content === 'string' ? content : typeof content === 'object' ? JSON.stringify(content, null, 2) : ''
   const isJsonLike = typeof safeContent === 'string' && safeContent.trim().startsWith('{')
@@ -241,17 +273,19 @@ function MessageBubble({ role, content, images, artifacts = [] }) {
                 e.stopPropagation()
                 setSelectedImage(null)
               }}
-              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-slate-950/60 text-xl text-white hover:bg-slate-800"
+              className="absolute left-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-950/70 text-xl text-white shadow-lg transition hover:bg-slate-800"
               aria-label="Close image"
             >
               ×
             </button>
-            <img
-              src={selectedImage}
-              alt="Expanded attachment"
-              className="max-h-[90vh] max-w-[85vw] object-contain"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <div className="flex max-h-[90vh] max-w-[85vw] items-center justify-center p-4 pt-12">
+              <img
+                src={selectedImage}
+                alt="Expanded attachment"
+                className="max-h-[84vh] max-w-[80vw] rounded-xl object-contain shadow-[0_20px_50px_rgba(15,23,42,0.6)]"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
           </div>
         </div>
       )}

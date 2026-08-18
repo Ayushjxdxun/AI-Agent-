@@ -24,6 +24,7 @@ workflow.addConditionalEdges("router", (state) => {
             return "chat";
         case "coding":
             return "coding";
+        case "image":
         case "vision":
             return "vision";
         case "pdf":
@@ -38,6 +39,7 @@ workflow.addConditionalEdges("router", (state) => {
 },{
     chat:"chat",
     coding:"coding",
+    image:"vision",
     vision:"vision",
     pdf:"pdf",
     ppt:"ppt",

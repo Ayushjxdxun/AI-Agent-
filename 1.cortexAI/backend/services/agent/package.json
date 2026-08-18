@@ -17,10 +17,13 @@
     "@langchain/langgraph": "^1.4.9",
     "@langchain/openrouter": "^0.4.8",
     "@langchain/tavily": "^1.2.0",
+    "@supabase/supabase-js": "^2.112.3",
     "axios": "^1.19.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "mongoose": "^9.9.2",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "pdfkit": "^0.19.1",
+    "pptxgenjs": "^4.0.1"
   }
 }

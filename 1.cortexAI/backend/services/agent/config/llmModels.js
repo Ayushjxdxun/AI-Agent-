@@ -24,6 +24,9 @@ export const getModel=(agent)=>{
             return openrouter;
         case "search":
             return groq;
+        case "image":
+        case "vision":
+            return groq;
         default:
             return groq;
     }

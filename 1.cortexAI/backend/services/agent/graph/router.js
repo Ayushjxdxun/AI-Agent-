@@ -1,16 +1,29 @@
 import { getModel } from "../config/llmModels.js"
 export const router=async (state)=>{
-    if(state.agent&&state.agent!=="auto") {
+    const normalizedAgent = String(state.agent || "").trim().toLowerCase();
+    if (normalizedAgent && normalizedAgent !== "auto") {
         return {
-        ...state,
-        agent:state.agent
-    }
+            ...state,
+            agent: normalizedAgent === "image" ? "vision" : normalizedAgent
+        }
     }
 
     const promptText = String(state.prompt || "");
-    const imageRequestPattern = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|wallpaper|poster|screenshot|screenshots)\b|\b(?:generate|create|make|draw|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\b|\b(?:show|give|find)\s+(?:me\s+)?(?:a\s+)?(?:image|images|picture|pictures|photo|photos)\b|\b(?:image|photos?|pictures?)\s+(?:of|for)\b/i;
+    const imageKeywordPattern = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|poster|wallpaper|screenshot|screenshots|portrait)\b/i;
+    const generationVerbPattern = /\b(?:generate|create|make|draw|render|design|produce|craft|compose)\b/i;
+    const imageGenerationPattern = /\b(?:generate|create|make|draw|render|design|produce|craft|compose)\s+(?:an?\s+)?(?:image|picture|photo|illustration|poster|artwork|portrait)\b|\b(?:image|picture|photo|illustration|poster|artwork|portrait)\s+(?:of|for)\b|\b(?:show|give|make)\s+(?:me\s+)?(?:a\s+)?(?:image|picture|photo|illustration)\b/i;
 
-    if (imageRequestPattern.test(promptText)) {
+    const isImageGenerationRequest = generationVerbPattern.test(promptText) && imageKeywordPattern.test(promptText);
+    const isWebImageLookupRequest = imageKeywordPattern.test(promptText) && !generationVerbPattern.test(promptText);
+
+    if (isImageGenerationRequest || imageGenerationPattern.test(promptText)) {
+        return {
+            ...state,
+            agent: "vision"
+        }
+    }
+
+    if (isWebImageLookupRequest) {
         return {
             ...state,
             agent: "search"

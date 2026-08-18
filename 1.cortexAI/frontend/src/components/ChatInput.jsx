@@ -7,10 +7,42 @@ import { addConversation, setSelectedConversation, setConvTitle } from '../redux
 import { createConversation } from '../features/createConversation'
 import { updateConversation } from '../features/updateConversation'
 
+const sanitizeImageList = (images = []) => {
+    if (!Array.isArray(images)) return [];
+
+    const unique = new Set();
+    return images
+        .map((image) => {
+            const raw = typeof image === 'string' ? image : image?.url || image?.src || image?.image_url?.url || '';
+            if (typeof raw !== 'string') return '';
+
+            const trimmed = raw.trim();
+            if (!trimmed || !/^https?:\/\//i.test(trimmed) || /\b(?:null|undefined)\b/i.test(trimmed)) return '';
+
+            try {
+                const parsed = new URL(trimmed);
+                if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+                const pathname = parsed.pathname.toLowerCase();
+                const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?.*)?$/i.test(pathname);
+                const hasImageFolder = /\/(?:images?|photos?|media|uploads?|files?|attachments?|content)\//i.test(pathname);
+                if (!hasImageExt && !hasImageFolder) return '';
+                return trimmed;
+            } catch {
+                return '';
+            }
+        })
+        .filter(Boolean)
+        .filter((url) => {
+            if (unique.has(url)) return false;
+            unique.add(url);
+            return true;
+        });
+};
+
 const extractImageUrls = (text) => {
     if (!text || typeof text !== "string") return [];
-    const urls = text.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s)"'>]*)?/gi) || [];
-    return [...new Set(urls.map((url) => url.trim()))];
+    const urls = text.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg|avif|heic|heif))(?:\?[^\s)"'>]*)?/gi) || [];
+    return sanitizeImageList(urls);
 };
 const extractArtifactFiles = (payload) => {
     if (!payload) return [];
@@ -118,9 +150,11 @@ function ChatInput() {
             const aiContent = typeof aiResponseData?.content === "string"
                 ? aiResponseData.content
                 : (typeof aiResponseData?.aiResponse === "string" ? aiResponseData.aiResponse : "");
-            const aiImages = Array.isArray(aiResponseData?.images) && aiResponseData.images.length
-                ? aiResponseData.images
-                : extractImageUrls(aiContent);
+            const aiImages = sanitizeImageList(
+                Array.isArray(aiResponseData?.images) && aiResponseData.images.length
+                    ? aiResponseData.images
+                    : extractImageUrls(aiContent)
+            );
             const aiArtifacts = Array.isArray(aiResponseData?.artifacts) && aiResponseData.artifacts.length
                 ? aiResponseData.artifacts
                 : extractArtifactFiles(aiContent);

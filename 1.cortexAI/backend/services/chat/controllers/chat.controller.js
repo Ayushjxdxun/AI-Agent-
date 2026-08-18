@@ -44,6 +44,38 @@ const normalizeMessageContent = (content) => {
     return "";
 };
 
+const sanitizeImageList = (images = []) => {
+    if (!Array.isArray(images)) return [];
+
+    const seen = new Set();
+    return images
+        .map((image) => {
+            const raw = typeof image === "string" ? image : image?.url || image?.src || image?.image_url?.url || "";
+            if (typeof raw !== "string") return "";
+
+            const trimmed = raw.trim();
+            if (!trimmed || !/^https?:\/\//i.test(trimmed) || /\b(?:null|undefined)\b/i.test(trimmed)) return "";
+
+            try {
+                const parsed = new URL(trimmed);
+                if (!["http:", "https:"].includes(parsed.protocol)) return "";
+                const pathname = parsed.pathname.toLowerCase();
+                const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?.*)?$/i.test(pathname);
+                const hasImageFolder = /\/(?:images?|photos?|media|uploads?|files?|attachments?|content|cdn)\//i.test(pathname);
+                if (!hasImageExt && !hasImageFolder) return "";
+                return trimmed;
+            } catch {
+                return "";
+            }
+        })
+        .filter(Boolean)
+        .filter((url) => {
+            if (seen.has(url)) return false;
+            seen.add(url);
+            return true;
+        });
+};
+
 export const saveMessage = async (req, res) => {
     try {
         const {conversationId, role, content,images,artifacts} = req.body;
@@ -52,7 +84,7 @@ export const saveMessage = async (req, res) => {
             conversationId,
             role,
             content: safeContent,
-            images: Array.isArray(images) ? images.filter(Boolean) : [],
+            images: sanitizeImageList(images),
             artifacts
         });
         return res.status(200).json({ message: "Message saved successfully", message });

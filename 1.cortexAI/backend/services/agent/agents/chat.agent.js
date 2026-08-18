@@ -16,15 +16,41 @@ const normalizeContent = (content) => {
     return "";
 };
 
+const normalizeImageUrl = (value) => {
+    if (!value) return "";
+
+    const raw = typeof value === "string" ? value : value?.image_url?.url || value?.url || value?.src || "";
+    if (typeof raw !== "string") return "";
+
+    const trimmed = raw.trim().replace(/[\])}>"']+$/g, "");
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) return "";
+    if (/\b(?:null|undefined)\b/i.test(trimmed)) return "";
+
+    try {
+        const parsed = new URL(trimmed);
+        if (!["http:", "https:"].includes(parsed.protocol)) return "";
+        const path = parsed.pathname.toLowerCase();
+        const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?.*)?$/i.test(path);
+        const hasImageFolder = /\/(?:images?|photos?|media|uploads?|files?|attachments?|content)\//i.test(path);
+        if (!hasImageExt && !hasImageFolder) {
+            return "";
+        }
+        return trimmed;
+    } catch {
+        return "";
+    }
+};
+
 const extractImages = (content) => {
     if (Array.isArray(content)) {
-        return content
-            .map((item) => item?.image_url?.url || item?.url || item?.src || "")
+        const urls = content
+            .map((item) => normalizeImageUrl(item))
             .filter(Boolean);
+        return [...new Set(urls)];
     }
     if (typeof content === "string") {
-        const urls = content.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s)"'>]*)?/gi) || [];
-        return [...new Set(urls.map((url) => url.trim()))];
+        const urls = content.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg|avif|heic|heif))(?:\?[^\s)"'>]*)?/gi) || [];
+        return [...new Set(urls.map((url) => normalizeImageUrl(url)).filter(Boolean))];
     }
     return [];
 };
@@ -118,8 +144,8 @@ export const chatAgent=async (state)=>{
     const responseImages = extractImages(response.content)
     const isImageRequest = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|wallpaper|poster|screenshot|screenshots)\b|\b(?:generate|create|make|draw|render)\s+(?:an?\s+)?(?:image|picture|photo|illustration)\b|\b(?:show|give|find)\s+(?:me\s+)?(?:a\s+)?(?:image|images|picture|pictures|photo|photos)\b|\b(?:image|photos?|pictures?)\s+(?:of|for)\b/i.test(String(state.prompt || ""));
     const finalImages = (Array.isArray(state.images) && state.images.length > 0)
-        ? state.images
-        : responseImages;
+        ? [...new Set(state.images.map((img) => normalizeImageUrl(img)).filter(Boolean))]
+        : [...new Set(responseImages)];
 
     const finalContent = isImageRequest && finalImages.length > 0
         ? "Here are the images you asked for."

@@ -125,15 +125,61 @@ const normalizeContent = (content) => {
     return "";
 };
 
+const normalizeImageUrl = (value) => {
+    if (!value) return "";
+
+    const raw = typeof value === "string" ? value : value?.image_url?.url || value?.url || value?.src || "";
+    if (typeof raw !== "string") return "";
+
+    const trimmed = raw.trim().replace(/[\])}>"']+$/g, "");
+    if (!trimmed || !/^https?:\/\//i.test(trimmed)) return "";
+    if (/\b(?:null|undefined)\b/i.test(trimmed)) return "";
+
+    try {
+        const parsed = new URL(trimmed);
+        if (!["http:", "https:"].includes(parsed.protocol)) return "";
+
+        const host = parsed.hostname.toLowerCase();
+        if (/(?:favicon|avatar|logo|ads|tracking|pixel|analytics|tinyurl|bit\.ly)/i.test(host) || /(?:favicon|avatar|logo|ads|tracking|pixel|analytics)/i.test(parsed.pathname.toLowerCase())) {
+            return "";
+        }
+
+        const path = parsed.pathname.toLowerCase();
+        const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?.*)?$/i.test(path);
+        const hasImageFolder = /\/(?:images?|photos?|media|uploads?|files?|attachments?|content|cdn)\//i.test(path);
+        if (!hasImageExt && !hasImageFolder) {
+            return "";
+        }
+        return trimmed;
+    } catch {
+        return "";
+    }
+};
+
+const sanitizeImageList = (images = []) => {
+    if (!Array.isArray(images)) return [];
+
+    const seen = new Set();
+    return images
+        .map((image) => normalizeImageUrl(image))
+        .filter(Boolean)
+        .filter((url) => {
+            if (seen.has(url)) return false;
+            seen.add(url);
+            return true;
+        });
+};
+
 const extractImages = (content) => {
     if (Array.isArray(content)) {
-        return content
-            .map((item) => item?.image_url?.url || item?.url || item?.src || "")
+        const urls = content
+            .map((item) => normalizeImageUrl(item))
             .filter(Boolean);
+        return [...new Set(urls)];
     }
     if (typeof content === "string") {
-        const urls = content.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg))(?:\?[^\s)"'>]*)?/gi) || [];
-        return [...new Set(urls.map((url) => url.trim()))];
+        const urls = content.match(/https?:\/\/[^\s)"'>]+(?:\.(?:png|jpe?g|gif|webp|bmp|svg|avif|heic|heif))(?:\?[^\s)"'>]*)?/gi) || [];
+        return [...new Set(urls.map((url) => normalizeImageUrl(url)).filter(Boolean))];
     }
     return [];
 };
@@ -156,7 +202,7 @@ export const agent=async(req,res) =>{
         const parsedFiles = parseGeneratedFiles(response) || parseGeneratedFiles(result?.artifacts) || [];
         const artifacts = parsedFiles.length ? [{ id: Date.now(), type: "Project", files: parsedFiles }] : (Array.isArray(result?.artifacts) ? result.artifacts : []);
         const normalizedResponse = normalizeContent(response);
-        const aiImages = Array.isArray(result?.images) ? result.images.filter(Boolean) : extractImages(response);
+        const aiImages = sanitizeImageList(Array.isArray(result?.images) ? result.images : extractImages(response));
 
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{
             conversationId,

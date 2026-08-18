@@ -2,6 +2,38 @@ import React from 'react'
 import { useSelector } from 'react-redux'
 import MessageBubble from './MessageBubble'
 
+const sanitizeImageList = (images = []) => {
+  if (!Array.isArray(images)) return []
+
+  const unique = new Set()
+  return images
+    .map((image) => {
+      const raw = typeof image === 'string' ? image : image?.url || image?.src || image?.image_url?.url || ''
+      if (typeof raw !== 'string') return ''
+
+      const trimmed = raw.trim()
+      if (!trimmed || !/^https?:\/\//i.test(trimmed) || /\b(?:null|undefined)\b/i.test(trimmed)) return ''
+
+      try {
+        const parsed = new URL(trimmed)
+        if (!['http:', 'https:'].includes(parsed.protocol)) return ''
+        const pathname = parsed.pathname.toLowerCase()
+        const hasImageExt = /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif)(\?.*)?$/i.test(pathname)
+        const hasImageFolder = /\/(?:images?|photos?|media|uploads?|files?|attachments?|content)\//i.test(pathname)
+        if (!hasImageExt && !hasImageFolder) return ''
+        return trimmed
+      } catch {
+        return ''
+      }
+    })
+    .filter(Boolean)
+    .filter((url) => {
+      if (unique.has(url)) return false
+      unique.add(url)
+      return true
+    })
+}
+
 function MessageList() {
   const { selectedConversation } = useSelector((state) => state.conversation)
   const { messages } = useSelector((state) => state.message)
@@ -30,13 +62,13 @@ function MessageList() {
         {messages
           .filter((msg) => {
             const hasText = typeof msg?.content === "string" ? msg.content.trim().length > 0 : false;
-            const hasImages = Array.isArray(msg?.images) ? msg.images.length > 0 : false;
+            const hasImages = sanitizeImageList(msg?.images || []).length > 0;
             const hasArtifacts = Array.isArray(msg?.artifacts) ? msg.artifacts.length > 0 : false;
             return hasText || hasImages || hasArtifacts;
           })
           .map((msg, i)=>(
           <div key={msg?._id || `${msg?.role}-${i}`}>
-            <MessageBubble role={msg?.role} content={msg?.content} images={msg.images || []} artifacts={msg?.artifacts || []}/>
+            <MessageBubble role={msg?.role} content={msg?.content} images={sanitizeImageList(msg.images || [])} artifacts={msg?.artifacts || []}/>
           </div>
         ))}
         </div>}
