@@ -1,5 +1,5 @@
 import { getModel } from "../config/llmModels.js"
-import { getMemory, addMessage } from "../config/memory.js"
+import { getMemory } from "../config/memory.js"
 import { SystemMessage, HumanMessage, AIMessage } from "@langchain/core/messages"
 
 const normalizeContent = (content) => {
@@ -151,10 +151,6 @@ export const chatAgent=async (state)=>{
         ? "Here are the images you asked for."
         : responseContent;
 
-    if (state.conversationId) {
-            await addMessage(state.conversationId, "user", state.prompt, state.images || []);
-            await addMessage(state.conversationId, "assistant", finalContent, finalImages);
-        }
     return {
         ...state,
         aiResponse: finalContent,

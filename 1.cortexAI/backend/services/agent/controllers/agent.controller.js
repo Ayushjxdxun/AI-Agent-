@@ -187,7 +187,6 @@ const extractImages = (content) => {
 export const agent=async(req,res) =>{
     try {
         const {prompt,conversationId,agent,images}=req.body
-        await addMessage(conversationId,"user",prompt,images)
 
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{conversationId,role:"user",content:prompt,images})
         const result=await graph.invoke({
@@ -203,6 +202,9 @@ export const agent=async(req,res) =>{
         const artifacts = parsedFiles.length ? [{ id: Date.now(), type: "Project", files: parsedFiles }] : (Array.isArray(result?.artifacts) ? result.artifacts : []);
         const normalizedResponse = normalizeContent(response);
         const aiImages = sanitizeImageList(Array.isArray(result?.images) ? result.images : extractImages(response));
+
+        await addMessage(conversationId,"user",prompt,images)
+        await addMessage(conversationId,"assistant",normalizedResponse,aiImages)
 
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{
             conversationId,
