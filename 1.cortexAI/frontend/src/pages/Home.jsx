@@ -18,7 +18,7 @@ function Home() {
       const {data}= await api.post("/api/auth/login",{token});
       dispatch(setUserData(data));
     } catch(error){
-      console.log(error);
+      console.error("Login failed:", error.response?.data?.message ?? error.message);
     }
   }
 
@@ -26,9 +26,7 @@ function Home() {
   const googleLogin =async () => {
       const data=await signInWithPopup(auth, googleProvider);
       const token=await data.user.getIdToken();
-      console.log(token);
       await handleLogin(token);
-      console.log(data);
   }
   return (
     <div className='h-screen flex min-w-0 bg-[#0a0d14] text-slate-100 overflow-hidden'>
