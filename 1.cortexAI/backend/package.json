@@ -6,6 +6,12 @@
   "author": "",
   "type": "module",
   "main": "index.js",
+  "workspaces": [
+    "gateway",
+    "services/auth",
+    "services/chat",
+    "services/agent"
+  ],
   "scripts": {
     "dev": "nodemon index.js"
   },
