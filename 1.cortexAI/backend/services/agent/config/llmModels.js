@@ -6,9 +6,20 @@ const groq = new ChatGroq({
     model: "openai/gpt-oss-120b",
 })
 
-const gemini=new ChatGoogleGenerativeAI({
-    model: "gemini-2.5-flash"
-})
+let gemini;
+const getGemini = () => {
+    if (!gemini) {
+        const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || process.env.Google_API_KEY;
+        if (!apiKey) {
+            throw new Error("Gemini requires GOOGLE_API_KEY, GEMINI_API_KEY, or Google_API_KEY in the environment.");
+        }
+        gemini = new ChatGoogleGenerativeAI({
+            model: "gemini-2.5-flash",
+            apiKey
+        });
+    }
+    return gemini;
+};
 
 const openrouter=new ChatOpenRouter({
     model: "deepseek/deepseek-chat",
@@ -27,6 +38,8 @@ export const getModel=(agent)=>{
         case "image":
         case "vision":
             return groq;
+        case "gemini":
+            return getGemini();
         default:
             return groq;
     }
