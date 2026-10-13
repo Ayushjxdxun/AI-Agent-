@@ -74,9 +74,23 @@ const parseProjectFiles = (rawText = "") => {
   return files.length ? { files } : { files: [] };
 };
 
+const invokeCodingModel = async (model, prompt) => {
+  try {
+    return await model.invoke(prompt);
+  } catch (error) {
+    const status = Number(error?.status ?? error?.statusCode);
+    if (status !== 429 && status !== 503) {
+      throw error;
+    }
+
+    console.warn(`Gemini coding request returned ${status}; retrying with Groq.`);
+    return getModel("chat").invoke(prompt);
+  }
+};
+
 export const codingAgent=async (state)=>{
-    //review code,generate code(in json) if debug or review return markdown i.e. simpple response .
-    //Use Gemini for coding; Groq classifies the request intent.
+    //review code,generate code(in JSON) if debug or review return markdown i.e. simpple response .
+    //Groq classifies the request intent; Gemini coding falls back to Groq on capacity errors.
   const intentLlm = await getModel("intent")
   const llm=await getModel("coding")
   const intentRes = await intentLlm.invoke(`
@@ -154,7 +168,7 @@ Rules:
 User Request:
 ${state.prompt}
 `
-    const res=await llm.invoke(prompt)
+    const res=await invokeCodingModel(llm, prompt)
     const parsed = parseProjectFiles(res.content)
     const files = parsed.files || []
 
@@ -168,7 +182,7 @@ ${state.prompt}
         }]
     }
   }
-const res = await llm.invoke(`
+const res = await invokeCodingModel(llm, `
 The user's request is:
 
 ${intent}
