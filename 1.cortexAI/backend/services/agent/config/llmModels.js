@@ -16,7 +16,7 @@ const getGemini = () => {
             throw new Error("Gemini requires GOOGLE_API_KEY or GEMINI_API_KEY in the environment.");
         }
         gemini = new ChatGoogleGenerativeAI({
-            model: "gemini-2.5-flash",
+            model: "gemini-3.8-flash",
             apiKey
         });
     }
