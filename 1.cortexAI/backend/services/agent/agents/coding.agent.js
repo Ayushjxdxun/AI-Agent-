@@ -76,7 +76,7 @@ const parseProjectFiles = (rawText = "") => {
 
 export const codingAgent=async (state)=>{
     //review code,generate code(in json) if debug or review return markdown i.e. simpple response .
-    //find the intent of the user , use deepseek for coding ,for intent detection use groq
+    //Use Gemini for coding; Groq classifies the request intent.
   const intentLlm = await getModel("intent")
   const llm=await getModel("coding")
   const intentRes = await intentLlm.invoke(`
