@@ -7,6 +7,12 @@ export const router=async (state)=>{
             agent: normalizedAgent === "image" ? "vision" : normalizedAgent
         }
     }
+    if (Array.isArray(state.documents) && state.documents.length > 0) {
+        return {
+            ...state,
+            agent: "chat"
+        }
+    }
 
     const promptText = String(state.prompt || "");
     const imageKeywordPattern = /\b(?:image|images|picture|pictures|photo|photos|illustration|illustrations|poster|wallpaper|screenshot|screenshots|portrait)\b/i;

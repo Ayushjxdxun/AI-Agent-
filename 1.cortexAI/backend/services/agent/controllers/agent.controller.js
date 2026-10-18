@@ -1,4 +1,5 @@
 import axios from "axios";
+import { PdfReader } from "pdfreader";
 import {graph} from "../graph/graph.js"
 import { addMessage } from "../config/memory.js";
 import { chatAgent } from "../agents/chat.agent.js";
@@ -184,16 +185,98 @@ const extractImages = (content) => {
     return [];
 };
 
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const MAX_ATTACHMENT_COUNT = 5;
+
+const badRequest = (message) => Object.assign(new Error(message), { status: 400 });
+
+const extractPdfText = (buffer) => new Promise((resolve, reject) => {
+    const text = [];
+    new PdfReader().parseBuffer(buffer, (error, item) => {
+        if (error) {
+            reject(error);
+        } else if (!item) {
+            resolve(text.join(" ").trim());
+        } else if (item.text) {
+            text.push(item.text);
+        }
+    });
+});
+
+const extractPdfDocuments = async (documents, images) => {
+    if (!Array.isArray(documents) || !Array.isArray(images)) {
+        throw badRequest("Invalid attachments.");
+    }
+    if (documents.length + images.length > MAX_ATTACHMENT_COUNT) {
+        throw badRequest(`Attach up to ${MAX_ATTACHMENT_COUNT} files at a time.`);
+    }
+
+    let totalBytes = 0;
+    const parsedDocuments = [];
+    for (const document of documents) {
+        if (typeof document?.name !== "string" || !document.name.toLowerCase().endsWith(".pdf")) {
+            throw badRequest("Only PDF documents are supported.");
+        }
+        const match = typeof document.data === "string"
+            ? document.data.match(/^data:application\/pdf;base64,([A-Za-z0-9+/]+={0,2})$/)
+            : null;
+        if (!match) throw badRequest(`Could not read ${document.name} as a PDF.`);
+
+        const buffer = Buffer.from(match[1], "base64");
+        totalBytes += buffer.length;
+        if (!buffer.length || buffer.subarray(0, 5).toString() !== "%PDF-") {
+            throw badRequest(`${document.name} is not a valid PDF file.`);
+        }
+        if (totalBytes > MAX_ATTACHMENT_BYTES) {
+            throw badRequest("Attachments must total no more than 10 MB.");
+        }
+
+        let parsed;
+        try {
+            parsed = await extractPdfText(buffer);
+        } catch (error) {
+            console.error(`Failed to extract text from ${document.name}:`, error);
+            throw badRequest(`Could not extract text from ${document.name}.`);
+        }
+        const text = String(parsed || "").trim();
+        if (!text) {
+            throw badRequest(`${document.name} contains no selectable text. Scanned PDFs need OCR, which is not available yet.`);
+        }
+        parsedDocuments.push({
+            name: document.name,
+            text: text.slice(0, 20000)
+        });
+    }
+
+    for (const image of images) {
+        if (typeof image !== "string" || !image.startsWith("data:image/")) continue;
+        const match = image.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/]+={0,2})$/);
+        if (!match) throw badRequest("Could not read one of the image attachments.");
+        totalBytes += Buffer.from(match[1], "base64").length;
+        if (totalBytes > MAX_ATTACHMENT_BYTES) {
+            throw badRequest("Attachments must total no more than 10 MB.");
+        }
+    }
+    return parsedDocuments;
+};
+
 export const agent=async(req,res) =>{
     try {
-        const {prompt,conversationId,agent,images}=req.body
+        const {prompt,conversationId,agent,images=[],documents=[]}=req.body
+        const parsedDocuments = await extractPdfDocuments(documents, images)
+        const attachedNames = [
+            ...parsedDocuments.map((document) => document.name),
+            ...images.filter((image) => typeof image === "string" && image.startsWith("data:image/")).map((_, index) => `image ${index + 1}`)
+        ]
+        const userContent = `${prompt || ""}${attachedNames.length ? `\n\nAttached: ${attachedNames.join(", ")}` : ""}`.trim()
 
-        await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{conversationId,role:"user",content:prompt,images})
+        await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{conversationId,role:"user",content:userContent})
         const result=await graph.invoke({
             prompt,
             conversationId,
             agent,
-            images
+            images,
+            documents: parsedDocuments
         })
         const response = typeof result === "string"
             ? result
@@ -203,7 +286,7 @@ export const agent=async(req,res) =>{
         const normalizedResponse = normalizeContent(response);
         const aiImages = sanitizeImageList(Array.isArray(result?.images) ? result.images : extractImages(response));
 
-        await addMessage(conversationId,"user",prompt,images)
+        await addMessage(conversationId,"user",userContent)
         await addMessage(conversationId,"assistant",normalizedResponse,aiImages)
 
         await axios.post(`${process.env.CHAT_SERVICE}/save-message`,{
@@ -216,7 +299,9 @@ export const agent=async(req,res) =>{
         
         return res.status(200).json({content:normalizedResponse, images: aiImages, artifacts});
     }catch(error){
-        console.log(error);
-        return res.status(500).json({ message: "Internal server error" });
+        console.error("Agent request failed:", error);
+        return res.status(error.status || 500).json({
+            message: error.status ? error.message : "Internal server error"
+        });
     }
 }

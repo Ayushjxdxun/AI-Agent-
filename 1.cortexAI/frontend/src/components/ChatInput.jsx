@@ -1,4 +1,4 @@
-import React ,{ useState, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { Paperclip, Mic, Send, Zap, MessageSquare, Code2, FileText, Presentation, ImageIcon, Globe, X } from 'lucide-react'
 import sendMessage from '../features/sendMessage'
 import { useSelector, useDispatch } from 'react-redux'
@@ -6,6 +6,16 @@ import { addMessage } from '../redux/messageSlice'
 import { addConversation, setSelectedConversation, setConvTitle } from '../redux/conversationSlice'
 import { createConversation } from '../features/createConversation'
 import { updateConversation } from '../features/updateConversation'
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+const MAX_ATTACHMENT_COUNT = 5
+
+const readFileAsDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error || new Error(`Could not read ${file.name}.`))
+    reader.readAsDataURL(file)
+})
 
 const sanitizeImageList = (images = []) => {
     if (!Array.isArray(images)) return [];
@@ -96,56 +106,94 @@ const extractArtifactFiles = (payload) => {
 function ChatInput() {
     const [value,setValue]=useState("")
     const [selectedAgent,setSelectedAgent]=useState("Auto")
-    const [images, setImages] = useState([])
+    const [attachments, setAttachments] = useState([])
+    const [uploadError, setUploadError] = useState("")
     const [isLoading, setIsLoading] = useState(false) // Added loading guard
     const fileInputRef = useRef(null)
     const {selectedConversation}=useSelector((state)=>state.conversation)
-    const { messages } = useSelector((state) => state.message)
     const dispatch=useDispatch()
 
-    const handleFileChange = (e) => {
-        const files = Array.from(e.target.files)
-        files.forEach(file => {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                setImages(prev => [...prev, reader.result])
-            }
-            reader.readAsDataURL(file)
-        })
+    const handleFileChange = async (e) => {
+        const files = Array.from(e.target.files || [])
+        e.target.value = ""
+        if (files.length === 0) return
+
+        const totalBytes = attachments.reduce((total, file) => total + file.size, 0)
+        if (attachments.length + files.length > MAX_ATTACHMENT_COUNT) {
+            setUploadError(`Attach up to ${MAX_ATTACHMENT_COUNT} files at a time.`)
+            return
+        }
+        if (files.some((file) => !(file.type.startsWith("image/") || file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")))) {
+            setUploadError("Only image files and PDFs are supported.")
+            return
+        }
+        if (files.some((file) => file.size === 0 || file.size > MAX_ATTACHMENT_BYTES) || totalBytes + files.reduce((total, file) => total + file.size, 0) > MAX_ATTACHMENT_BYTES) {
+            setUploadError("Attachments must be non-empty and total no more than 10 MB.")
+            return
+        }
+
+        try {
+            const loadedFiles = await Promise.all(files.map(async (file) => ({
+                id: `${file.name}-${file.lastModified}-${Math.random()}`,
+                name: file.name,
+                type: file.type.startsWith("image/") ? file.type : "application/pdf",
+                size: file.size,
+                data: await readFileAsDataUrl(file)
+            })))
+            setAttachments((current) => [...current, ...loadedFiles])
+            setUploadError("")
+        } catch (error) {
+            console.error("Failed to read attachment:", error)
+            setUploadError(error.message || "Could not read the selected file.")
+        }
     }
 
     const handleSendMessage=async()=>{
-      if ((!value.trim() && images.length === 0) || isLoading) return
+      if ((!value.trim() && attachments.length === 0) || isLoading) return
       
       setIsLoading(true) // Lock sending until response finishes
-      let conversation=selectedConversation
-      if(!conversation) {
-        let conv=await createConversation()
-        conv=conv?.conversation || conv?.data || conv
-        dispatch(setSelectedConversation(conv))
-        dispatch(addConversation(conv))
-        conversation=conv
-      }
-      if(conversation.title=="New Chat") {
-        const conv=await updateConversation({id:conversation?._id,title:value.trim() || "Image Chat"})
-        dispatch(setConvTitle({conversationId:conversation?._id,title:(value.trim() || "Image Chat").slice(0,40)}))
-      }
-        const payload={
-            prompt:value.trim(),conversationId:conversation?._id,agent:selectedAgent.toLowerCase(),images
-        }
-        const userMessage = {
-            _id: Date.now(),
-            conversationId: conversation?._id,
-            role: "user",
-            content: payload.prompt,
-            images
-        }
-        dispatch(addMessage(userMessage))
-        setValue("")
-        setImages([])
-        
         try {
+            let conversation=selectedConversation
+            if(!conversation) {
+                let conv=await createConversation()
+                conv=conv?.conversation || conv?.data || conv
+                if (!conv?._id) throw new Error("Could not create a conversation.")
+                dispatch(setSelectedConversation(conv))
+                dispatch(addConversation(conv))
+                conversation=conv
+            }
+            const prompt = value.trim() || (attachments.some((file) => file.type === "application/pdf")
+                ? "Please analyze the attached document."
+                : "Please analyze the attached image(s).")
+            if(conversation.title=="New Chat") {
+                await updateConversation({id:conversation?._id,title:prompt})
+                dispatch(setConvTitle({conversationId:conversation?._id,title:prompt.slice(0,40)}))
+            }
+            const images = attachments
+                .filter((file) => file.type.startsWith("image/"))
+                .map((file) => file.data)
+            const documents = attachments
+                .filter((file) => file.type === "application/pdf")
+                .map(({name, data}) => ({name, data}))
+            const attachmentNames = attachments.map((file) => file.name)
+            const payload={
+                prompt,
+                conversationId:conversation?._id,
+                agent:selectedAgent.toLowerCase(),
+                images,
+                documents
+            }
+            const userMessage = {
+                _id: Date.now(),
+                conversationId: conversation?._id,
+                role: "user",
+                content: `${prompt}${attachmentNames.length ? `\n\nAttached: ${attachmentNames.join(", ")}` : ""}`,
+                images
+            }
+            dispatch(addMessage(userMessage))
+
             const data = await sendMessage(payload)
+            if (!data) throw new Error("The server returned an empty response.")
             const aiResponseData = data?.data || data;
             const aiContent = typeof aiResponseData?.content === "string"
                 ? aiResponseData.content
@@ -180,8 +228,12 @@ function ChatInput() {
                     title: payload.prompt || "Image Chat"
                 }))
             }
+            setValue("")
+            setAttachments([])
+            setUploadError("")
         } catch (err) {
             console.error("Failed to send message:", err)
+            setUploadError(err.response?.data?.message || err.message || "Failed to send the message. Please try again.")
         } finally {
             setIsLoading(false) // Unlock sending
         }
@@ -263,15 +315,21 @@ function ChatInput() {
           })}
         </div>
         
-        {/* Image Preview Area */}
-        {images.length > 0 && (
+        {attachments.length > 0 && (
           <div className="flex gap-2 flex-wrap py-1">
-            {images.map((img, idx) => (
-              <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-white/10">
-                <img src={img} alt="preview" className="w-full h-full object-cover" />
+            {attachments.map((file) => (
+              <div key={file.id} className="relative flex h-16 max-w-56 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-2 pr-8">
+                {file.type.startsWith("image/") ? (
+                  <img src={file.data} alt={file.name} className="h-12 w-12 shrink-0 rounded object-cover" />
+                ) : (
+                  <FileText size={20} className="shrink-0 text-violet-300" />
+                )}
+                <span className="truncate text-xs text-slate-300" title={file.name}>{file.name}</span>
                 <button 
-                  onClick={() => setImages(images.filter((_, i) => i !== idx))}
-                  className="absolute top-1 right-1 bg-black/60 rounded-full p-0.5 text-white hover:bg-black cursor-pointer"
+                  type="button"
+                  aria-label={`Remove ${file.name}`}
+                  onClick={() => setAttachments((current) => current.filter((attachment) => attachment.id !== file.id))}
+                  className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white hover:bg-black cursor-pointer"
                 >
                   <X size={12} />
                 </button>
@@ -279,6 +337,7 @@ function ChatInput() {
             ))}
           </div>
         )}
+        {uploadError && <p role="alert" className="text-xs text-red-300">{uploadError}</p>}
 
         <textarea
           placeholder={isLoading ? "AI is thinking..." : "Ask Anything..."}
@@ -296,10 +355,13 @@ function ChatInput() {
           ref={fileInputRef} 
           onChange={handleFileChange} 
           multiple 
-          accept="image/*" 
+          accept="image/*,.pdf,application/pdf"
+          disabled={isLoading}
           className="hidden" 
         />
         <button 
+          type="button"
+          disabled={isLoading}
           onClick={() => fileInputRef.current?.click()}
           className='flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 hover:text-slate-400 hover:bg-white/[0.05] border border-transparent hover:border-white/[0.06] transition-all duration-150 bg-transparent cursor-pointer'
         >
@@ -310,10 +372,10 @@ function ChatInput() {
         </button>
         </div>
         <button
-        disabled={(!value.trim() && images.length === 0) || isLoading}
+        disabled={(!value.trim() && attachments.length === 0) || isLoading}
         onClick={handleSendMessage}
         className={`flex items-center justify-center w-8 h-8 rounded-lg border-none cursor-pointer transition-all duration-150 ${
-            (value.trim() || images.length > 0) && !isLoading
+            (value.trim() || attachments.length > 0) && !isLoading
             ? "bg-linear-to-br from-indigo-500 to-violet-700 hover:opacity-90 text-white"
             : "bg-white/[0.05] text-slate-600 cursor-not-allowed"
         }`}
