@@ -85,6 +85,11 @@ export const chatAgent=async (state)=>{
         .join("\n\n")}
     Answer the user using only the above search results.
     ` : ""
+    const documentContext = Array.isArray(state.documents) && state.documents.length > 0
+        ? state.documents
+            .map((document) => `--- ${document.name} ---\n${document.text}`)
+            .join("\n\n")
+        : ""
     const prompt=`
         You are CortexAI, an intelligent AI assistant.
 
@@ -134,10 +139,7 @@ export const chatAgent=async (state)=>{
         : [];
 
     let humanText = state.prompt;
-    if (Array.isArray(state.documents) && state.documents.length > 0) {
-        const documentContext = state.documents
-            .map((document) => `--- ${document.name} ---\n${document.text}`)
-            .join("\n\n");
+    if (documentContext) {
         humanText = `${state.prompt}\n\nAttached PDF text:\n${documentContext}`;
     }
     let humanContent = humanText;
